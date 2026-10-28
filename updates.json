@@ -1,0 +1,14 @@
+{
+  "addons": {
+    "selection-notes@local.invalid": {
+      "updates": [
+        {
+          "version": "2.0.4",
+          "update_link": "https://github.com/PAOPAOovo/zotero-selection-notes/releases/download/v2.0.4/zotero-selection-notes-2.0.4.xpi",
+          "update_hash": "sha256:b44bab037481ab1deed1bd00da5c1a5e492e7505728893442c2955e0f71d0fe8",
+          "applications": { "zotero": { "strict_min_version": "9.0", "strict_max_version": "9.0.*" } }
+        }
+      ]
+    }
+  }
+}

@@ -1,8 +1,8 @@
 {
   "name": "zotero-selection-notes",
-  "version": "1.0.8",
+  "version": "2.0.4",
   "private": true,
-  "description": "Selection-anchored Markdown, LaTeX, and code notes for Zotero 9",
+  "description": "Selection-anchored Markdown, LaTeX, and code notes with portable exports for Zotero 9",
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
@@ -10,6 +10,7 @@
     "test": "node --test test/*.test.mjs"
   },
   "devDependencies": {
-    "katex": "0.19.1"
+    "katex": "0.19.1",
+    "pdf-lib": "^1.17.1"
   }
 }

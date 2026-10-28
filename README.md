@@ -1,45 +1,80 @@
-# Selection Notes 1.0.8 for Zotero 9
+# Selection Notes for Zotero 9
 
-1.0 系列最终版。在 Zotero PDF 阅读器中选中文字后，点击“📝 写笔记”，编写支持 Markdown、LaTeX 和围栏代码高亮的笔记；保存后点击原文高亮，即可查看渲染结果并继续编辑。
+Selection-anchored Markdown, LaTeX, and code notes for the Zotero PDF reader.
 
-适用于 Zotero **9.0.x**，已在 macOS / Zotero 9.0.6 上验证。此版本包含核心笔记编辑与渲染功能，无 2.0 系列的整包导出功能。需要导出论文与笔记，请使用 [2.0.4](https://github.com/PAOPAOovo/zotero-selection-notes/releases/tag/v2.0.4)。
+在 Zotero 中选中 PDF 文字，点击“📝 写笔记”，即可编写支持 Markdown、LaTeX 和代码高亮的笔记。保存后点击原文高亮，就能查看排版后的内容并继续编辑。
+
+## 发布版本
+
+本仓库仅发布两个版本，均适用于 Zotero **9.0.x**，已在 **macOS / Zotero 9.0.6** 上验证。
+
+| 版本 | 用途 | 安装包 |
+| --- | --- | --- |
+| **2.0.4** | 当前推荐版本；含笔记编辑及 PDF、HTML、Markdown 导出 | `zotero-selection-notes-2.0.4.xpi` |
+| **1.0.8** | 1.0 系列最终版；含笔记编辑和渲染，无整包导出 | `zotero-selection-notes-1.0.8.xpi` |
+
+请从 [Releases](https://github.com/PAOPAOovo/zotero-selection-notes/releases) 下载对应的 `.xpi`。两个版本使用相同的插件 ID，请选择其中一个安装；升级会保留已有批注。旧版源码位于标签 `v1.0.8`，最新版位于 `main` 和标签 `v2.0.4`。1.0 系列使用单独的更新清单，升级到 2.0 请手动选择安装。
 
 ## 安装
 
-1. 从 [v1.0.8 Release](https://github.com/PAOPAOovo/zotero-selection-notes/releases/tag/v1.0.8) 下载 `zotero-selection-notes-1.0.8.xpi`。
-2. 打开 Zotero“工具 → 插件”，通过齿轮菜单选择“从文件安装插件”。
-3. 选择 `.xpi` 完成安装，完全退出（macOS：`⌘Q`）并重新打开 Zotero。
+1. 下载所需版本的 `.xpi` 文件。
+2. 在 Zotero 打开“工具 → 插件”，点击齿轮菜单，选择“从文件安装插件”。
+3. 选择下载的 `.xpi`，按提示完成安装。
+4. 完全退出 Zotero（macOS：`⌘Q`），然后重新打开。
 
-两个版本使用相同插件 ID，请选择一个安装。升级与更换版本会保留 Zotero 中已有批注。
+## 写笔记
 
-## 使用
+1. 在 PDF 阅读器选中一段文字。
+2. 点击选区工具条中的“📝 写笔记”，打开编辑器。
+3. 输入 Markdown，在右侧查看实时预览。
+4. 点击保存，或按 `⌘ Enter` / `Ctrl Enter`。
+5. 再次点击原文高亮可查看渲染结果，点击“笔记详情 / 编辑”可修改。
 
-1. 在 PDF 中选中文字，点击“📝 写笔记”。编辑器仅在点击后打开。
-2. 左侧编写 Markdown，右侧实时预览。
-3. 点击保存或按 `⌘ Enter` / `Ctrl Enter`。
-4. 再次点击原文高亮查看渲染结果，点击“笔记详情 / 编辑”可修改。
-
-支持标题、粗体、斜体、删除线、链接、引用、列表、任务列表、表格、行内/块级公式和代码块。编辑器支持方向键操作，批注弹窗宽度会随笔记内容和阅读区调整。
+支持标题、粗体、斜体、删除线、链接、引用、列表、任务列表、表格、行内公式、块级公式、行内代码和围栏代码块。
 
 ````markdown
-## 我的笔记
+## 关键结论
 
 行内公式：$E=mc^2$。
 
+$$
+\frac{d\mathrm{DM}}{dt} = \langle n_e \rangle v_r
+$$
+
 ```python
-print("Hello, Zotero!")
+def hello():
+    print("Hello, Zotero!")
 ```
 ````
 
-## 数据和边界
+## 导出论文和笔记（2.0.4）
 
-笔记源码保存在 Zotero 原生批注的 `comment` 字段中；同步由 Zotero 管理。笔记编辑和渲染离线完成，原始 HTML 不会执行。当前仅声明支持 Zotero 9.0.x，其他系统和大版本尚未验证。
+在 PDF 顶部点击“⇩ 导出笔记”，或在 PDF 空白处右键选择“导出 PDF + 笔记…”，然后选择目标文件夹。
 
-持久位置由原生高亮保存，“笔记详情 / 编辑”位于点击高亮后出现的批注弹窗中。内置 Markdown 与代码着色覆盖常用语法，并非完整 CommonMark 或语言解析器。
+每次导出会创建独立的时间戳文件夹，其中包含：
 
-## 构建
+- 原论文的带高亮、批注 PDF 副本；
+- `*.rendered-notes.pdf`：原论文后追加已排版的笔记附录；
+- `*.notes.html`：可离线阅读的渲染版笔记；
+- `*.notes.md`：可继续编辑的 Markdown 源文件。
 
-需要 Node.js 18+、npm 和系统 `zip`：
+**使用其他 PDF 阅读器查看公式时，请打开 `.rendered-notes.pdf` 的末尾附录。** PDF 通用批注评论是纯文本，其他阅读器中的高亮弹窗仍可能显示 Markdown/LaTeX 源码。Zotero 的“文件 → 另存为”使用原生导出，不会生成这个笔记包。
+
+笔记附录以图像形式写入 PDF 页面，能保留排版，但附录文字不可像普通文本那样选择。需要复制或编辑时请使用配套 HTML / Markdown。
+
+## 数据与兼容性
+
+- 笔记源码保存在 Zotero 原生批注的 `comment` 字段中；同步由 Zotero 管理。
+- 编辑、渲染及导出在本机完成，无需上传论文或笔记。
+- KaTeX 和 PDF 组件随安装包提供，可离线使用。
+- 原始 HTML 不会执行，代码块只作展示。
+- 当前仅声明支持 Zotero 9.0.x；Windows、Linux 及其他 Zotero 大版本尚未验证。
+- 锚点采用 Zotero 原生高亮，“笔记详情 / 编辑”按钮显示在点击高亮后出现的批注弹窗内。
+- 内置 Markdown 和代码着色覆盖常用语法，并非完整 CommonMark 或语言解析器。
+
+## 从源码构建
+
+需要 Node.js 18+、npm 和系统 `zip`。下载或检出所需版本的源码后运行：
 
 ```sh
 npm ci
@@ -48,8 +83,16 @@ npm run check
 npm test
 ```
 
-安装包生成在 `dist/`。KaTeX 及字体由构建脚本复制到安装包中。
+安装包生成在 `dist/`。`addon/content/vendor/` 中的依赖由构建脚本生成，依赖版本记录在 `package-lock.json` 中。
 
-## 许可
+在安装了 Zotero 的 macOS 上，还可运行本地 API 检查：
 
-[MIT License](LICENSE)。KaTeX 使用 MIT License，其原始许可证随 XPI 分发。第三方说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+```sh
+node scripts/verify-zotero.mjs
+```
+
+2.0.4 的 `scripts/gecko-export-smoke.js` 提供实际 Zotero 渲染测试。运行方式见该文件开头；它读取当前打开的 PDF 与批注，并将测试副本写入项目的 `tmp/` 目录。
+
+## 开源许可
+
+本项目使用 [MIT License](LICENSE)。KaTeX 和 pdf-lib 均使用 MIT License，其许可证随构建后的安装包一同分发。第三方组件说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

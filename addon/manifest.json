@@ -1,14 +1,14 @@
 {
   "manifest_version": 2,
   "name": "Selection Notes",
-  "version": "1.0.8",
-  "description": "Write Markdown, LaTeX, and code notes from text selections in the Zotero 9 reader.",
+  "version": "2.0.4",
+  "description": "Write and export selection-anchored Markdown, LaTeX, and code notes in the Zotero 9 reader.",
   "author": "PAOPAOovo",
   "homepage_url": "https://github.com/PAOPAOovo/zotero-selection-notes",
   "applications": {
     "zotero": {
       "id": "selection-notes@local.invalid",
-      "update_url": "https://raw.githubusercontent.com/PAOPAOovo/zotero-selection-notes/main/updates-v1.json",
+      "update_url": "https://raw.githubusercontent.com/PAOPAOovo/zotero-selection-notes/main/updates.json",
       "strict_min_version": "9.0",
       "strict_max_version": "9.0.*"
     }

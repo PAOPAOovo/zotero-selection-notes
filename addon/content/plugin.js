@@ -1,4 +1,4 @@
-/* global Zotero, Services, ZSN, setTimeout, clearTimeout, setInterval, clearInterval */
+/* global Zotero, Services, ZSN, Blob, XMLSerializer, Uint8Array, setTimeout, clearTimeout, setInterval, clearInterval */
 
 ZSN.plugin = (function () {
 	const events = [];
@@ -14,6 +14,7 @@ ZSN.plugin = (function () {
 		log(String(error));
 	};
 	const CRITICAL_STYLES = `
+		.zsn-toolbar-export-button { display: flex; align-items: center; height: 28px; padding: 0 9px; border-radius: 6px; font: 600 12px sans-serif; cursor: pointer; }
 		.zsn-overlay { position: fixed; inset: 0; z-index: 2147483600; pointer-events: none; }
 		.zsn-card { position: absolute; display: flex; flex-direction: column; overflow: hidden;
 			max-height: calc(100vh - 28px); border: 1px solid rgba(0,0,0,.18); border-radius: 12px;
@@ -89,7 +90,7 @@ ZSN.plugin = (function () {
 			decoratePopups(state);
 			return state;
 		}
-		state = { doc, reader, katex: readerKaTeX, observer: null, card: null, renderTimer: null };
+		state = { doc, reader, katex: readerKaTeX, observer: null, card: null, renderTimer: null, exporting: false };
 		state.observer = new doc.defaultView.MutationObserver(() => decoratePopups(state));
 		state.observer.observe(doc.body, { childList: true, subtree: true });
 		stateByDoc.set(doc, state);
@@ -101,6 +102,7 @@ ZSN.plugin = (function () {
 	function decoratePopups(state) {
 		decorateSelectionPopups(state);
 		decorateAnnotationPopups(state);
+		decorateToolbarButtons(state);
 	}
 
 	function selectionPopupAnnotation(reader) {
@@ -290,13 +292,60 @@ ZSN.plugin = (function () {
 		}
 	}
 
+	function bindExportButton(state, button) {
+		if (button._zsnBound) return;
+		button._zsnBound = true;
+		button.addEventListener('click', event => {
+			event.preventDefault();
+			event.stopPropagation();
+			exportNoteBundle(state, button).catch(error => {
+				report(error);
+				toast(state.doc, t('导出失败：', 'Export failed: ') + String(error));
+			});
+		});
+	}
+
+	function makeExportButton(doc) {
+		let button = doc.createElement('button');
+		button.type = 'button';
+		button.className = 'zsn-toolbar-export-button';
+		button.textContent = t('⇩ 导出笔记', '⇩ Export notes');
+		button.title = t('导出带批注 PDF、渲染附录 PDF、HTML 和 Markdown', 'Export an annotated PDF, rendered-appendix PDF, HTML, and Markdown');
+		return button;
+	}
+
+	function decorateToolbarButtons(state) {
+		let buttons = [...state.doc.querySelectorAll('.zsn-toolbar-export-button')];
+		if (!buttons.length) {
+			// renderToolbar only fires while React creates the toolbar. When the
+			// plugin is enabled with an already-open PDF, insert the same control
+			// into the existing custom section; the reader scan keeps it present.
+			let host = state.doc.querySelector('.toolbar .end .custom-sections');
+			if (host) {
+				let section = state.doc.createElement('div');
+				section.className = 'section zsn-export-section';
+				let button = makeExportButton(state.doc);
+				section.appendChild(button);
+				host.prepend(section);
+				buttons.push(button);
+			}
+		}
+		for (let button of buttons) {
+			bindExportButton(state, button);
+		}
+	}
+
 	function onToolbar(event) {
 		try {
-			setupDocument(event.doc, event.reader);
-			let marker = event.doc.createElement('span');
-			marker.hidden = true;
-			marker.className = 'zsn-toolbar-marker';
-			event.append(marker);
+			let state = setupDocument(event.doc, event.reader);
+			let existing = event.doc.querySelector('.zsn-toolbar-export-button');
+			if (existing) {
+				bindExportButton(state, existing);
+				return;
+			}
+			let button = makeExportButton(event.doc);
+			bindExportButton(state, button);
+			event.append(button);
 		}
 		catch (e) { report(e); }
 	}
@@ -309,6 +358,22 @@ ZSN.plugin = (function () {
 			onCommand: () => {
 				let doc = event.reader && event.reader._iframeWindow && event.reader._iframeWindow.document;
 				if (doc) openExisting(doc, event.reader, String(ids[0]), null).catch(report);
+			}
+		});
+	}
+
+	function onViewContextMenu(event) {
+		event.append({
+			label: t('导出 PDF + 笔记…', 'Export PDF + notes…'),
+			onCommand: () => {
+				let doc = event.reader && event.reader._iframeWindow && event.reader._iframeWindow.document;
+				if (!doc) return;
+				let state = setupDocument(doc, event.reader);
+				let button = doc.querySelector('.zsn-toolbar-export-button');
+				exportNoteBundle(state, button).catch(error => {
+					report(error);
+					toast(doc, t('导出失败：', 'Export failed: ') + String(error));
+				});
 			}
 		});
 	}
@@ -497,6 +562,314 @@ ZSN.plugin = (function () {
 		setTimeout(() => node.remove(), 3200);
 	}
 
+	function escapeHTML(value) {
+		return String(value || '')
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#39;');
+	}
+
+	function exportTimestamp(date = new Date()) {
+		let pad = value => String(value).padStart(2, '0');
+		return date.getFullYear() + pad(date.getMonth() + 1) + pad(date.getDate())
+			+ '-' + pad(date.getHours()) + pad(date.getMinutes()) + pad(date.getSeconds());
+	}
+
+	function exportedNotesFor(attachment) {
+		// getAnnotations() returns an Array from Zotero's privileged compartment.
+		// Calling its iterator/map chain and later iterating the result can throw
+		// "Permission denied to access property Symbol.iterator" in Zotero 9.
+		// Copy each record by numeric index into an Array owned by this add-on.
+		let items = attachment.getAnnotations();
+		let notes = [];
+		for (let index = 0; index < items.length; index++) {
+			let item = items[index];
+			let source = String(item.annotationComment || '');
+			if (!source.trim()) continue;
+			let position = {};
+			try { position = JSON.parse(item.annotationPosition || '{}'); } catch (e) {}
+			notes.push({
+				key: String(item.key || ''),
+				page: String(item.annotationPageLabel || (Number.isInteger(position.pageIndex) ? position.pageIndex + 1 : '')),
+				text: String(item.annotationText || ''),
+				source,
+				dateModified: String(item.dateModified || ''),
+				sortIndex: String(item.annotationSortIndex || '')
+			});
+		}
+		notes.sort((a, b) => a.sortIndex.localeCompare(b.sortIndex));
+		return notes;
+	}
+
+	function exportMetadata(attachment) {
+		let parent = attachment.parentID ? Zotero.Items.get(attachment.parentID) : null;
+		let filename = attachment.attachmentFilename || 'paper.pdf';
+		let title = parent ? parent.getField('title') : filename.replace(/\.pdf$/i, '');
+		let authorNames = [];
+		if (parent) {
+			let creators = parent.getCreators();
+			for (let index = 0; index < creators.length; index++) {
+				let creator = creators[index];
+				let name = creator.name || [creator.firstName, creator.lastName].filter(Boolean).join(' ');
+				if (name) authorNames.push(String(name));
+			}
+		}
+		let authors = authorNames.join(', ');
+		return { title: title || filename, authors, filename };
+	}
+
+	function buildMarkdownExport(metadata, notes, exportedAt) {
+		let lines = [
+			'# ' + metadata.title,
+			'',
+			'- PDF: `' + metadata.filename.replace(/`/g, '\\`') + '`',
+			'- ' + t('导出时间', 'Exported') + ': ' + exportedAt,
+			'- ' + t('笔记数量', 'Notes') + ': ' + notes.length
+		];
+		if (metadata.authors) lines.splice(2, 0, '- ' + t('作者', 'Authors') + ': ' + metadata.authors);
+		for (let [index, note] of notes.entries()) {
+			lines.push('', '---', '', '## ' + t('笔记', 'Note') + ' ' + (index + 1)
+				+ (note.page ? ' · ' + t('第', 'Page ') + note.page + (zh ? ' 页' : '') : ''), '');
+			if (note.text) {
+				lines.push(note.text.split(/\r?\n/).map(line => '> ' + line).join('\n'), '');
+			}
+			lines.push(note.source, '', '<!-- Zotero annotation: ' + note.key + ' -->');
+		}
+		return lines.join('\n') + '\n';
+	}
+
+	function createRenderedExportNote(doc, source) {
+		let container = doc.createElement('div');
+		container.className = 'note-body';
+		ZSN.renderer.render(source, container);
+		// Native MathML is self-contained and needs no bundled fonts. Remove the
+		// parallel KaTeX HTML presentation and unwrap MathML before serialization.
+		for (let duplicate of container.querySelectorAll('.katex-html')) duplicate.remove();
+		for (let wrapper of container.querySelectorAll('.katex-mathml')) {
+			let math = wrapper.querySelector('math');
+			if (math) wrapper.replaceWith(math);
+		}
+		// Native form controls are not painted inside SVG image documents.
+		// Use static marks so exported task lists retain their checked state.
+		for (let input of container.querySelectorAll('input[type="checkbox"]')) {
+			let mark = doc.createElement('span');
+			mark.textContent = input.checked ? '☑ ' : '☐ ';
+			input.replaceWith(mark);
+		}
+		return container;
+	}
+
+	function renderExportNote(doc, source) {
+		return createRenderedExportNote(doc, source).innerHTML;
+	}
+
+	const PDF_NOTE_PAGE_CSS = `
+		.zsn-pdf-note-page{box-sizing:border-box;width:1240px;min-height:1754px;padding:76px 88px;background:#fff;color:#171717;font:24px/1.62 -apple-system,BlinkMacSystemFont,"Helvetica Neue","PingFang SC",sans-serif}
+		.zsn-pdf-note-page *{box-sizing:border-box}.pdf-header{border-bottom:2px solid #d5d9df;padding-bottom:20px;margin-bottom:30px}.pdf-header h1{font-size:31px;line-height:1.28;margin:0 0 8px}.pdf-header .meta{color:#68707d;font-size:18px}.pdf-note-title{display:flex;justify-content:space-between;gap:24px;align-items:baseline;margin:0 0 22px}.pdf-note-title h2{font-size:27px;margin:0}.pdf-note-title span{color:#68707d;font-size:19px}.selection{white-space:pre-wrap;margin:0 0 28px;padding:16px 20px;border-left:7px solid #e2b600;background:#fff9d8;color:#505866}.note-body h1,.note-body h2,.note-body h3,.note-body h4{line-height:1.3;margin:1em 0 .45em}.note-body p{margin:.65em 0}.note-body blockquote{margin:.8em 0;padding:.2em 0 .2em 1em;border-left:5px solid #7c9bd3;color:#505866}.note-body ul,.note-body ol{padding-left:1.7em}.note-body table{border-collapse:collapse;width:100%;margin:.8em 0}.note-body th,.note-body td{border:2px solid #c8ccd2;padding:7px 10px;text-align:left}.zsn-inline-code{padding:.1em .32em;border-radius:5px;background:#eceef2;font:90% ui-monospace,SFMono-Regular,Menlo,monospace}.zsn-code-block{position:relative;overflow:hidden;margin:.8em 0;padding:40px 20px 20px;border-radius:10px;background:#151922;color:#e8edf3;font:19px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}.zsn-code-language{position:absolute;top:8px;right:13px;color:#98a2b3;font-size:15px}.zsn-token-keyword{color:#c792ea}.zsn-token-string{color:#c3e88d}.zsn-token-number{color:#f78c6c}.zsn-token-comment{color:#86909c;font-style:italic}.zsn-math-display,math[display="block"]{display:block;overflow:hidden;text-align:center;margin:1em 0}.pdf-footer{margin-top:32px;padding-top:14px;border-top:2px solid #e2e5e9;color:#7b828d;font-size:16px}
+	`;
+
+	function createPDFNotePage(doc, metadata, note, index, total, exportedAt) {
+		let page = doc.createElement('section');
+		page.className = 'zsn-pdf-note-page';
+		page.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+		let style = doc.createElement('style');
+		style.textContent = PDF_NOTE_PAGE_CSS;
+		let paperHeader = doc.createElement('header');
+		paperHeader.className = 'pdf-header';
+		let paperTitle = doc.createElement('h1');
+		paperTitle.textContent = metadata.title;
+		let paperMeta = doc.createElement('div');
+		paperMeta.className = 'meta';
+		paperMeta.textContent = [metadata.authors, metadata.filename].filter(Boolean).join(' · ');
+		paperHeader.append(paperTitle, paperMeta);
+		let noteHeader = doc.createElement('div');
+		noteHeader.className = 'pdf-note-title';
+		let heading = doc.createElement('h2');
+		heading.textContent = t('笔记', 'Note') + ' ' + (index + 1) + ' / ' + total;
+		let pageLabel = doc.createElement('span');
+		pageLabel.textContent = note.page ? t('原文第 ', 'Source page ') + note.page + (zh ? ' 页' : '') : '';
+		noteHeader.append(heading, pageLabel);
+		page.append(style, paperHeader, noteHeader);
+		if (note.text) {
+			let selection = doc.createElement('blockquote');
+			selection.className = 'selection';
+			selection.textContent = note.text;
+			page.appendChild(selection);
+		}
+		page.appendChild(createRenderedExportNote(doc, note.source));
+		let footer = doc.createElement('footer');
+		footer.className = 'pdf-footer';
+		footer.textContent = 'Selection Notes · ' + exportedAt + ' · Zotero ' + note.key;
+		page.appendChild(footer);
+		return page;
+	}
+
+	async function renderPDFNotePage(doc, metadata, note, index, total, exportedAt) {
+		let host = doc.createElement('div');
+		host.style.cssText = 'position:fixed;left:-20000px;top:0;width:1240px;z-index:-1;';
+		let page = createPDFNotePage(doc, metadata, note, index, total, exportedAt);
+		host.appendChild(page);
+		doc.body.appendChild(host);
+		let height;
+		let serialized;
+		try {
+			height = Math.max(1754, Math.ceil(page.scrollHeight) + 2);
+			page.style.minHeight = height + 'px';
+			// SVG is XML: HTML outerHTML leaves void elements unclosed and can
+			// emit HTML-only entities. Serialize XHTML and MathML with namespaces.
+			serialized = new XMLSerializer().serializeToString(page);
+		}
+		finally {
+			host.remove();
+		}
+		let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="${height}" viewBox="0 0 1240 ${height}"><foreignObject width="1240" height="${height}">${serialized}</foreignObject></svg>`;
+		// A system-principal blob: URL cannot be loaded by Zotero's reader
+		// content principal. A self-contained data: URL works in that document
+		// and passes only a string across the compartment boundary.
+		let url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+		let image = doc.createElement('img');
+		let loadTimer;
+		try {
+			await new Promise((resolve, reject) => {
+				loadTimer = setTimeout(() => reject(new Error(t('笔记页图像加载超时', 'Note page image loading timed out'))), 15000);
+				image.onload = resolve;
+				image.onerror = () => reject(new Error(t('无法生成笔记页图像', 'Could not render the note page image')));
+				image.src = url;
+			});
+			let canvas = doc.createElement('canvas');
+			canvas.width = 1240;
+			canvas.height = height;
+			let context = canvas.getContext('2d');
+			context.fillStyle = '#ffffff';
+			context.fillRect(0, 0, canvas.width, canvas.height);
+			context.drawImage(image, 0, 0);
+			// pdf-lib accepts a PNG data URL and decodes it in its own realm.
+			// A typed array returned by another compartment fails its instanceof
+			// checks even when it contains valid PNG bytes.
+			return canvas.toDataURL('image/png');
+		}
+		finally {
+			clearTimeout(loadTimer);
+			image.onload = null;
+			image.onerror = null;
+			image.removeAttribute('src');
+		}
+	}
+
+	async function appendRenderedNotesToPDF(state, inputPath, outputPath, metadata, notes, exportedAt) {
+		if (!ZSN.PDFLib) throw new Error(t('渲染 PDF 组件未加载', 'Rendered PDF components are unavailable'));
+		let stage = t('读取带批注 PDF', 'reading the annotated PDF');
+		try {
+			// Strings cross the Zotero/add-on/pdf-lib compartments without exposing
+			// foreign iterators or failing pdf-lib's realm-sensitive byte checks.
+			let binary = await Zotero.File.getBinaryContentsAsync(inputPath);
+			let input = state.doc.defaultView.btoa(binary);
+			stage = t('打开 PDF 文档', 'opening the PDF document');
+			let pdf = await ZSN.PDFLib.PDFDocument.load(input);
+			for (let index = 0; index < notes.length; index++) {
+				stage = t('渲染笔记附录 ', 'rendering note appendix ') + (index + 1) + '/' + notes.length;
+				let note = notes[index];
+				let png = await renderPDFNotePage(state.doc, metadata, note, index, notes.length, exportedAt);
+				stage = t('合并笔记附录 ', 'embedding note appendix ') + (index + 1) + '/' + notes.length;
+				let image = await pdf.embedPng(png);
+				let width = 595.28;
+				let height = Math.max(841.89, width * image.height / image.width);
+				let page = pdf.addPage();
+				page.setSize(width, height);
+				page.drawImage(image, { x: 0, y: 0, width, height });
+			}
+			stage = t('保存渲染附录 PDF', 'saving the rendered-appendix PDF');
+			let outputBinary = state.doc.defaultView.atob(await pdf.saveAsBase64());
+			let output = new Uint8Array(outputBinary.length);
+			for (let index = 0; index < outputBinary.length; index++) output[index] = outputBinary.charCodeAt(index);
+			let outputBlob = new Blob([output], { type: 'application/pdf' });
+			await Zotero.File.putContentsAsync(outputPath, outputBlob);
+		}
+		catch (error) {
+			throw new Error(stage + ': ' + (error && error.message ? error.message : String(error)));
+		}
+	}
+
+	function buildHTMLExport(doc, metadata, notes, exportedAt) {
+		let entries = notes.map((note, index) => `
+		<article class="note" id="note-${index + 1}">
+			<header><h2>${escapeHTML(t('笔记', 'Note'))} ${index + 1}</h2><span>${note.page ? escapeHTML(t('第', 'Page ') + note.page + (zh ? ' 页' : '')) : ''}</span></header>
+			${note.text ? `<blockquote class="selection">${escapeHTML(note.text)}</blockquote>` : ''}
+			${renderExportNote(doc, note.source)}
+			<details><summary>${escapeHTML(t('查看 Markdown 源码', 'View Markdown source'))}</summary><pre class="source">${escapeHTML(note.source)}</pre></details>
+		</article>`).join('\n');
+		return `<!doctype html>
+<html lang="${zh ? 'zh-CN' : 'en'}"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHTML(metadata.title)} — Selection Notes</title>
+<style>
+:root{color-scheme:light dark}*{box-sizing:border-box}body{max-width:900px;margin:0 auto;padding:32px 24px;font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:CanvasText;background:Canvas}h1{line-height:1.25;margin-bottom:.25em}.meta{color:GrayText;margin-bottom:2rem}.note{margin:1.25rem 0;padding:1.1rem 1.25rem;border:1px solid color-mix(in srgb,CanvasText 18%,transparent);border-radius:12px;break-inside:avoid}.note>header{display:flex;align-items:baseline;justify-content:space-between;gap:1rem}.note h2{margin:0;font-size:1.15rem}.note>header span{color:GrayText}.selection{white-space:pre-wrap;margin:.8rem 0;padding:.55rem .8rem;border-left:4px solid #e2b600;background:color-mix(in srgb,#ffd400 12%,Canvas);color:GrayText}.note-body h1,.note-body h2,.note-body h3{line-height:1.3}.note-body table{border-collapse:collapse;width:100%}.note-body th,.note-body td{border:1px solid color-mix(in srgb,CanvasText 22%,transparent);padding:.35rem .5rem}.zsn-inline-code{padding:.1em .3em;border-radius:4px;background:color-mix(in srgb,CanvasText 10%,transparent);font-family:ui-monospace,monospace}.zsn-code-block,.source{overflow:auto;padding:1rem;border-radius:8px;background:#151922;color:#e8edf3;font:13px/1.55 ui-monospace,monospace;white-space:pre}.zsn-code-language{float:right;color:#98a2b3}.zsn-token-keyword{color:#c792ea}.zsn-token-string{color:#c3e88d}.zsn-token-number{color:#f78c6c}.zsn-token-comment{color:#86909c;font-style:italic}.zsn-math-display{overflow:auto;text-align:center;margin:1rem 0}.katex-html{display:none}details{margin-top:1rem;color:GrayText}details .source{color:#e8edf3}@media print{body{max-width:none;padding:0}.note{border-color:#bbb;page-break-inside:avoid}details{display:none}}
+</style></head><body>
+<h1>${escapeHTML(metadata.title)}</h1>
+<div class="meta">${metadata.authors ? escapeHTML(metadata.authors) + '<br>' : ''}${escapeHTML(metadata.filename)} · ${escapeHTML(exportedAt)} · ${notes.length} ${escapeHTML(t('条笔记', 'notes'))}</div>
+${entries}
+</body></html>`;
+	}
+
+	async function chooseExportFolder(state) {
+		if (!ZSN.FilePicker) throw new Error(t('导出文件选择器未加载', 'The export file picker is unavailable'));
+		let picker = new ZSN.FilePicker();
+		picker.init(state.doc.defaultView, t('选择论文和笔记的导出位置', 'Choose where to export the paper and notes'), picker.modeGetFolder);
+		let result = await picker.show();
+		return result === picker.returnOK ? picker.file : null;
+	}
+
+	async function exportNoteBundle(state, button) {
+		if (state.exporting) return;
+		let attachment = attachmentFor(state.reader);
+		let notes = exportedNotesFor(attachment);
+		if (!notes.length) {
+			toast(state.doc, t('当前 PDF 还没有可导出的笔记。', 'This PDF has no notes to export yet.'));
+			return;
+		}
+		state.exporting = true;
+		if (button) {
+			button.disabled = true;
+			button.textContent = t('正在导出…', 'Exporting…');
+		}
+		try {
+			let destination = await chooseExportFolder(state);
+			if (!destination) return;
+			let metadata = exportMetadata(attachment);
+			let baseName = Zotero.File.getValidFileName(metadata.title).slice(0, 100) || 'paper';
+			let packageName = baseName + '-Selection-Notes-' + exportTimestamp();
+			if (!ZSN.OS) throw new Error(t('导出路径组件未加载', 'The export path component is unavailable'));
+			let packagePath = ZSN.OS.Path.join(destination, packageName);
+			await Zotero.File.createDirectoryIfMissingAsync(packagePath);
+			let pdfName = Zotero.File.getValidFileName(metadata.filename || (baseName + '.pdf'));
+			if (!/\.pdf$/i.test(pdfName)) pdfName += '.pdf';
+			let pdfStem = pdfName.replace(/\.pdf$/i, '');
+			let annotatedPDFPath = ZSN.OS.Path.join(packagePath, pdfName);
+			let renderedPDFPath = ZSN.OS.Path.join(packagePath, pdfStem + '.rendered-notes.pdf');
+			let exportedAt = new Date().toLocaleString();
+			await Zotero.PDFWorker.export(attachment.id, annotatedPDFPath, true);
+			await Zotero.File.putContentsAsync(
+				ZSN.OS.Path.join(packagePath, baseName + '.notes.md'),
+				buildMarkdownExport(metadata, notes, exportedAt)
+			);
+			await Zotero.File.putContentsAsync(
+				ZSN.OS.Path.join(packagePath, baseName + '.notes.html'),
+				buildHTMLExport(state.doc, metadata, notes, exportedAt)
+			);
+			await appendRenderedNotesToPDF(state, annotatedPDFPath, renderedPDFPath, metadata, notes, exportedAt);
+			toast(state.doc, t('已导出 ', 'Exported ') + notes.length + t(' 条笔记、带批注 PDF 和渲染附录 PDF。', ' notes, the annotated PDF, and the rendered-appendix PDF.'));
+		}
+		finally {
+			state.exporting = false;
+			if (button) {
+				button.disabled = false;
+				button.textContent = t('⇩ 导出笔记', '⇩ Export notes');
+			}
+		}
+	}
+
 	async function startup() {
 		zh = String(Zotero.locale || '').toLowerCase().startsWith('zh');
 		Zotero.SelectionNotes = {
@@ -512,6 +885,7 @@ ZSN.plugin = (function () {
 		register('renderTextSelectionPopup', onTextSelection);
 		register('renderToolbar', onToolbar);
 		register('createAnnotationContextMenu', onAnnotationContextMenu);
+		register('createViewContextMenu', onViewContextMenu);
 		// Independent fallback for Zotero 9: discover open readers and observe the
 		// native selection popup directly, even if another plugin breaks the
 		// public event dispatch chain before our listener is reached.

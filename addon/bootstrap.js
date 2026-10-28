@@ -1,12 +1,16 @@
-/* global Zotero, Services */
+/* global Zotero, Services, ChromeUtils */
 
 var ZSN = {
 	id: null,
 	version: null,
 	rootURI: null,
 	katex: null,
+	PDFLib: null,
+	FilePicker: null,
+	OS: null,
 	styles: ''
 };
+var PDFLib;
 
 var ZSN_SCRIPTS = ['content/renderer.js', 'content/plugin.js'];
 
@@ -17,6 +21,16 @@ async function startup({ id, version, rootURI }) {
 	ZSN.id = id;
 	ZSN.version = version;
 	ZSN.rootURI = rootURI;
+	// Export support is optional. Never let a platform/file-picker problem stop
+	// the reader note editor and renderer from starting.
+	try {
+		ZSN.FilePicker = ChromeUtils.importESModule('chrome://zotero/content/modules/filePicker.mjs').FilePicker;
+		ZSN.OS = ChromeUtils.importESModule('chrome://zotero/content/osfile.mjs').OS;
+	}
+	catch (e) {
+		Zotero.logError(e);
+		Zotero.debug('[Selection Notes] Export platform helpers are unavailable');
+	}
 
 	// Reader documents do not reliably load a stylesheet linked from a packed
 	// bootstrapped XPI. Read the bundled CSS with system privileges and inject it
@@ -51,6 +65,20 @@ async function startup({ id, version, rootURI }) {
 	catch (e) {
 		Zotero.logError(e);
 		Zotero.debug('[Selection Notes] KaTeX failed to load; math will use source fallback');
+	}
+	try {
+		// Load into the same add-on global as plugin.js. pdf-lib performs realm-
+		// sensitive Array/Uint8Array checks, so a separate sandbox would reject
+		// otherwise valid page dimensions and image bytes.
+		Services.scriptloader.loadSubScript(rootURI + 'content/vendor/pdf-lib/pdf-lib.min.js', this);
+		ZSN.PDFLib = PDFLib || this.PDFLib;
+		if (!ZSN.PDFLib || typeof ZSN.PDFLib.PDFDocument !== 'function') {
+			throw new Error('pdf-lib did not expose its API');
+		}
+	}
+	catch (e) {
+		Zotero.logError(e);
+		Zotero.debug('[Selection Notes] pdf-lib failed to load; rendered PDF appendix export is unavailable');
 	}
 	for (let script of ZSN_SCRIPTS) Services.scriptloader.loadSubScript(rootURI + script, this);
 	await ZSN.plugin.startup();

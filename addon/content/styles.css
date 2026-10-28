@@ -18,6 +18,20 @@
 .zsn-sidebar-button:hover { background: var(--fill-quinary, rgba(120, 120, 120, .16)); }
 .zsn-detail-button { display: block; width: calc(100% - 16px); margin: 8px; padding: 7px 10px; color: #2456a6; }
 .zsn-sidebar-button { padding: 3px 7px; margin-inline-start: 5px; }
+.zsn-toolbar-export-button {
+	display: flex;
+	align-items: center;
+	height: 28px;
+	padding: 0 9px;
+	border-radius: 6px;
+	background: var(--fill-quinary, rgba(120, 120, 120, .08));
+	color: var(--fill-primary, #222);
+	font: 600 12px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+	cursor: pointer;
+	white-space: nowrap;
+}
+.zsn-toolbar-export-button:hover { background: var(--fill-quarternary, rgba(120, 120, 120, .16)); }
+.zsn-toolbar-export-button:disabled { opacity: .55; cursor: default; }
 
 /* Keep Zotero's source editor in the DOM, but show the rendered note in its
    place when a saved annotation has a comment. The plugin's edit button below
