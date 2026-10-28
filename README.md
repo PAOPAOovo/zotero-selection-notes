@@ -13,7 +13,7 @@ Selection-anchored Markdown, LaTeX, and code notes for the Zotero PDF reader.
 | **2.0.4** | 当前推荐版本；含笔记编辑及 PDF、HTML、Markdown 导出 | `zotero-selection-notes-2.0.4.xpi` |
 | **1.0.8** | 1.0 系列最终版；含笔记编辑和渲染，无整包导出 | `zotero-selection-notes-1.0.8.xpi` |
 
-请从 [Releases](https://github.com/PAOPAOovo/zotero-selection-notes/releases) 下载对应的 `.xpi`。两个版本使用相同的插件 ID，请选择其中一个安装；升级会保留已有批注。旧版源码位于标签 `v1.0.8`，最新版位于 `main` 和标签 `v2.0.4`。1.0 系列使用单独的更新清单，升级到 2.0 请手动选择安装。
+请从 [Releases](https://github.com/PAOPAOovo/zotero-selection-notes/releases) 下载对应的 `.xpi`。两个版本使用相同的插件 ID，请选择其中一个安装；升级会保留已有批注。旧版源码位于 [release-1.0.8](https://github.com/PAOPAOovo/zotero-selection-notes/tree/release-1.0.8) 分支，最新版位于 `main`。
 
 ## 安装
 
@@ -96,3 +96,9 @@ node scripts/verify-zotero.mjs
 ## 开源许可
 
 本项目使用 [MIT License](LICENSE)。KaTeX 和 pdf-lib 均使用 MIT License，其许可证随构建后的安装包一同分发。第三方组件说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+## AI 辅助开发声明
+
+本项目在开发过程中使用了 **OpenAI GPT / Codex** 辅助编写代码、调试问题和整理文档。项目的功能需求与发布决定由维护者确定。
+
+This project was developed with assistance from OpenAI GPT / Codex for coding, debugging, and documentation.

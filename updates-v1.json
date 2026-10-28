@@ -4,8 +4,8 @@
       "updates": [
         {
           "version": "1.0.8",
-          "update_link": "https://github.com/PAOPAOovo/zotero-selection-notes/releases/download/v1.0.8/zotero-selection-notes-1.0.8.xpi",
-          "update_hash": "sha256:1ed88a48a704f6353955f18c0e369d420e5a98e8226967642229e4b3ac9f688b",
+          "update_link": "https://github.com/PAOPAOovo/zotero-selection-notes/releases/download/zotero-selection-notes-1.0/zotero-selection-notes-1.0.8.xpi",
+          "update_hash": "sha256:dd393f0a03f46bdd52253b2a69b01ded666dc34276ffaaa42128ab2db41a5b0a",
           "applications": { "zotero": { "strict_min_version": "9.0", "strict_max_version": "9.0.*" } }
         }
       ]
