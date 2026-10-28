@@ -2,11 +2,11 @@
 
 1.0 系列最终版。在 Zotero PDF 阅读器中选中文字后，点击“📝 写笔记”，编写支持 Markdown、LaTeX 和围栏代码高亮的笔记；保存后点击原文高亮，即可查看渲染结果并继续编辑。
 
-适用于 Zotero **9.0.x**，已在 macOS / Zotero 9.0.6 上验证。此版本包含核心笔记编辑与渲染功能，无 2.0 系列的整包导出功能。需要导出论文与笔记，请使用 [2.0.4](https://github.com/PAOPAOovo/zotero-selection-notes/releases/tag/v2.0.4)。
+适用于 Zotero **9.0.x**，已在 macOS / Zotero 9.0.6 上验证。此版本包含核心笔记编辑与渲染功能，无 2.0 系列的整包导出功能。需要导出论文与笔记，请使用 [2.0.4](https://github.com/PAOPAOovo/zotero-selection-notes/releases/tag/zotero-selection-notes-2.0)。
 
 ## 安装
 
-1. 从 [v1.0.8 Release](https://github.com/PAOPAOovo/zotero-selection-notes/releases/tag/v1.0.8) 下载 `zotero-selection-notes-1.0.8.xpi`。
+1. 从 [1.0.8 Release](https://github.com/PAOPAOovo/zotero-selection-notes/releases/tag/zotero-selection-notes-1.0) 下载 `zotero-selection-notes-1.0.8.xpi`。
 2. 打开 Zotero“工具 → 插件”，通过齿轮菜单选择“从文件安装插件”。
 3. 选择 `.xpi` 完成安装，完全退出（macOS：`⌘Q`）并重新打开 Zotero。
 
@@ -53,3 +53,9 @@ npm test
 ## 许可
 
 [MIT License](LICENSE)。KaTeX 使用 MIT License，其原始许可证随 XPI 分发。第三方说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+## AI 辅助开发声明
+
+本项目在开发过程中使用了 **OpenAI GPT / Codex** 辅助编写代码、调试问题和整理文档。项目的功能需求与发布决定由维护者确定。
+
+This project was developed with assistance from OpenAI GPT / Codex for coding, debugging, and documentation.
