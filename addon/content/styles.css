@@ -1,0 +1,229 @@
+@import url("vendor/katex/katex.min.css");
+
+.zsn-selection-button,
+.zsn-detail-button,
+.zsn-sidebar-button {
+	appearance: none;
+	border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+	border-radius: 7px;
+	background: var(--material-background, #fff);
+	color: var(--fill-primary, #222);
+	font: 600 12px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+	cursor: pointer;
+	white-space: nowrap;
+}
+.zsn-selection-button { height: 25px; padding: 0 9px; margin: 2px; }
+.zsn-selection-button:hover,
+.zsn-detail-button:hover,
+.zsn-sidebar-button:hover { background: var(--fill-quinary, rgba(120, 120, 120, .16)); }
+.zsn-detail-button { display: block; width: calc(100% - 16px); margin: 8px; padding: 7px 10px; color: #2456a6; }
+.zsn-sidebar-button { padding: 3px 7px; margin-inline-start: 5px; }
+
+/* Keep Zotero's source editor in the DOM, but show the rendered note in its
+   place when a saved annotation has a comment. The plugin's edit button below
+   opens the Markdown source editor. */
+.annotation-popup.zsn-rendered {
+	width: min(var(--zsn-popup-width, 440px), calc(100vw - 40px));
+	min-width: min(320px, calc(100vw - 40px));
+	max-width: calc(100vw - 40px);
+}
+.annotation-popup.zsn-rendered .preview > .comment {
+	display: none !important;
+}
+.zsn-annotation-preview {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: none;
+	max-height: 280px;
+	overflow: auto;
+	padding: 8px 10px;
+	border-top: 1px solid rgba(127, 127, 127, .16);
+	border-bottom: 1px solid rgba(127, 127, 127, .16);
+}
+
+/* Transparent and non-modal: PDF text outside the card remains selectable. */
+.zsn-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 2147483600;
+	pointer-events: none;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.zsn-card {
+	position: absolute;
+	width: min(760px, calc(100vw - 28px));
+	max-height: min(680px, calc(100vh - 28px));
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	border: 1px solid rgba(0, 0, 0, .18);
+	border-radius: 12px;
+	background: var(--material-background, #fff);
+	color: var(--fill-primary, #222);
+	box-shadow: 0 14px 44px rgba(0, 0, 0, .32);
+	pointer-events: auto;
+}
+.zsn-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 9px 11px;
+	background: var(--material-toolbar, rgba(120, 120, 120, .08));
+	border-bottom: 1px solid rgba(0, 0, 0, .11);
+	cursor: move;
+}
+.zsn-title { font-weight: 700; flex: 1; }
+.zsn-subtitle {
+	font-size: 11px;
+	color: var(--fill-secondary, #666);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 52%;
+}
+.zsn-close {
+	appearance: none;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font-size: 19px;
+	line-height: 1;
+	cursor: pointer;
+	padding: 2px 5px;
+	border-radius: 5px;
+}
+.zsn-close:hover { background: rgba(127, 127, 127, .18); }
+
+.zsn-body { min-height: 290px; display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; }
+.zsn-pane { min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.zsn-pane + .zsn-pane { border-inline-start: 1px solid rgba(0, 0, 0, .1); }
+.zsn-pane-label {
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--fill-secondary, #666);
+	padding: 7px 10px;
+	background: rgba(127, 127, 127, .05);
+	border-bottom: 1px solid rgba(0, 0, 0, .08);
+}
+.zsn-editor {
+	box-sizing: border-box;
+	flex: 1;
+	min-height: 330px;
+	width: 100%;
+	resize: none;
+	border: 0;
+	outline: 0;
+	padding: 12px;
+	background: transparent;
+	color: inherit;
+	font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	tab-size: 2;
+}
+.zsn-preview {
+	box-sizing: border-box;
+	flex: 1;
+	overflow: auto;
+	padding: 12px 15px;
+	font-size: 14px;
+	line-height: 1.62;
+	user-select: text;
+}
+.zsn-preview > *:first-child { margin-top: 0; }
+.zsn-preview > *:last-child { margin-bottom: 0; }
+.zsn-preview h1,
+.zsn-preview h2,
+.zsn-preview h3,
+.zsn-preview h4 { line-height: 1.25; margin: 1em 0 .45em; }
+.zsn-preview h1 { font-size: 1.55em; }
+.zsn-preview h2 { font-size: 1.32em; }
+.zsn-preview h3 { font-size: 1.16em; }
+.zsn-preview p { margin: .65em 0; }
+.zsn-preview blockquote {
+	margin: .75em 0;
+	padding: .15em 0 .15em .9em;
+	border-left: 3px solid #7c9bd3;
+	color: var(--fill-secondary, #555);
+}
+.zsn-preview ul, .zsn-preview ol { padding-left: 1.6em; }
+.zsn-preview a { color: #2b67c0; text-decoration: none; }
+.zsn-preview a:hover { text-decoration: underline; }
+.zsn-preview table { border-collapse: collapse; width: 100%; margin: .8em 0; }
+.zsn-preview th, .zsn-preview td { border: 1px solid rgba(127, 127, 127, .3); padding: 5px 7px; text-align: left; }
+.zsn-preview th { background: rgba(127, 127, 127, .09); }
+
+.zsn-inline-code {
+	padding: .12em .34em;
+	border-radius: 4px;
+	background: rgba(127, 127, 127, .14);
+	font: 90% ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.zsn-code-block {
+	position: relative;
+	overflow: auto;
+	margin: .8em 0;
+	padding: 24px 12px 12px;
+	border-radius: 8px;
+	background: #151922;
+	color: #e8edf3;
+	font: 12px/1.58 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	white-space: pre;
+}
+.zsn-code-language {
+	position: absolute;
+	top: 4px;
+	right: 8px;
+	color: #8f9aa8;
+	font: 10px/1.3 sans-serif;
+	text-transform: uppercase;
+}
+.zsn-token-keyword { color: #c792ea; }
+.zsn-token-string { color: #c3e88d; }
+.zsn-token-number { color: #f78c6c; }
+.zsn-token-comment { color: #77828f; font-style: italic; }
+.zsn-math-display { overflow: auto; margin: .8em 0; text-align: center; }
+.zsn-render-error { color: #b33; font-family: ui-monospace, monospace; }
+
+.zsn-footer {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 11px;
+	border-top: 1px solid rgba(0, 0, 0, .1);
+	background: var(--material-toolbar, rgba(127, 127, 127, .05));
+}
+.zsn-hint { flex: 1; font-size: 11px; color: var(--fill-secondary, #666); }
+.zsn-action {
+	appearance: none;
+	border: 1px solid rgba(0, 0, 0, .18);
+	border-radius: 7px;
+	background: var(--material-background, #fff);
+	color: inherit;
+	padding: 6px 13px;
+	font: 600 12px sans-serif;
+	cursor: pointer;
+}
+.zsn-action:hover { background: rgba(127, 127, 127, .12); }
+.zsn-action.primary { background: #2f6fca; color: #fff; border-color: #2f6fca; }
+.zsn-action.primary:hover { background: #245ca9; }
+.zsn-action:disabled { opacity: .5; cursor: default; }
+.zsn-toast {
+	position: fixed;
+	left: 50%;
+	bottom: 24px;
+	transform: translateX(-50%);
+	z-index: 2147483647;
+	padding: 8px 13px;
+	border-radius: 8px;
+	background: rgba(25, 25, 28, .94);
+	color: white;
+	font: 12px/1.4 sans-serif;
+	box-shadow: 0 5px 20px rgba(0, 0, 0, .28);
+}
+
+@media (max-width: 720px) {
+	.zsn-body { grid-template-columns: 1fr; overflow: auto; }
+	.zsn-pane + .zsn-pane { border-inline-start: 0; border-top: 1px solid rgba(0, 0, 0, .1); }
+	.zsn-editor { min-height: 210px; }
+	.zsn-preview { min-height: 210px; }
+	.zsn-card { max-height: calc(100vh - 18px); }
+}

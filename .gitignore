@@ -1,0 +1,9 @@
+node_modules/
+build/
+dist/
+tmp/
+addon/content/vendor/
+.DS_Store
+*.log
+.env
+.env.*
